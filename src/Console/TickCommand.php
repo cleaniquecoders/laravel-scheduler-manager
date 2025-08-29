@@ -22,7 +22,7 @@ class TickCommand extends Command
 
         foreach ($schedulers as $scheduler) {
             try {
-                $cron = CronExpression::factory($scheduler->cron);
+                $cron = new CronExpression($scheduler->cron);
                 $due = $cron->isDue($now->toDateTimeString());
             } catch (\Throwable $e) {
                 $this->error('Invalid cron for scheduler '.$scheduler->id.': '.$e->getMessage());
