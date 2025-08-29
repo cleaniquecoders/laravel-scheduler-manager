@@ -2,9 +2,9 @@
 
 namespace CleaniqueCoders\LaravelSchedulerManager\Tests;
 
+use CleaniqueCoders\LaravelSchedulerManager\LaravelSchedulerManagerServiceProvider;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Orchestra\Testbench\TestCase as Orchestra;
-use CleaniqueCoders\LaravelSchedulerManager\LaravelSchedulerManagerServiceProvider;
 
 class TestCase extends Orchestra
 {

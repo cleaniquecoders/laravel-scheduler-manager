@@ -1,0 +1,29 @@
+<?php
+
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class {
+    public function up()
+    {
+        Schema::create('scheduler_runs', function (Blueprint $table) {
+            $table->id();
+            $table->uuid('uuid')->index();
+            $table->unsignedBigInteger('scheduler_id');
+            $table->timestamp('started_at')->nullable();
+            $table->timestamp('finished_at')->nullable();
+            $table->enum('status', ['running', 'success', 'failed'])->default('running');
+            $table->integer('exit_code')->nullable();
+            $table->text('output')->nullable();
+            $table->text('exception')->nullable();
+            $table->timestamps();
+
+            $table->foreign('scheduler_id')->references('id')->on('schedulers')->onDelete('cascade');
+        });
+    }
+
+    public function down()
+    {
+        Schema::dropIfExists('scheduler_runs');
+    }
+};

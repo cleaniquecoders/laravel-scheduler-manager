@@ -2,9 +2,9 @@
 
 namespace CleaniqueCoders\LaravelSchedulerManager;
 
+use CleaniqueCoders\LaravelSchedulerManager\Commands\LaravelSchedulerManagerCommand;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
-use CleaniqueCoders\LaravelSchedulerManager\Commands\LaravelSchedulerManagerCommand;
 
 class LaravelSchedulerManagerServiceProvider extends PackageServiceProvider
 {
@@ -20,6 +20,7 @@ class LaravelSchedulerManagerServiceProvider extends PackageServiceProvider
             ->hasConfigFile()
             ->hasViews()
             ->hasMigration('create_laravel_scheduler_manager_table')
-            ->hasCommand(LaravelSchedulerManagerCommand::class);
+            ->hasCommand(LaravelSchedulerManagerCommand::class)
+            ->hasCommand(\CleaniqueCoders\LaravelSchedulerManager\Console\TickCommand::class);
     }
 }
