@@ -1,12 +1,12 @@
 <?php
 
-namespace VendorName\Skeleton\Commands;
+namespace CleaniqueCoders\LaravelSchedulerManager\Commands;
 
 use Illuminate\Console\Command;
 
-class SkeletonCommand extends Command
+class LaravelSchedulerManagerCommand extends Command
 {
-    public $signature = 'skeleton';
+    public $signature = 'laravel-scheduler-manager';
 
     public $description = 'My command';
 
