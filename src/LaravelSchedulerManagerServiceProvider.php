@@ -19,7 +19,7 @@ class LaravelSchedulerManagerServiceProvider extends PackageServiceProvider
             ->name('laravel-scheduler-manager')
             ->hasConfigFile()
             ->hasViews()
-            ->hasMigration('create_laravel_scheduler_manager_table')
+            ->hasMigration('create_schedulers_table')
             ->hasCommand(LaravelSchedulerManagerCommand::class)
             ->hasCommand(\CleaniqueCoders\LaravelSchedulerManager\Console\TickCommand::class);
     }

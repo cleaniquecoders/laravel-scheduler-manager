@@ -4,6 +4,7 @@ namespace CleaniqueCoders\LaravelSchedulerManager\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 class Scheduler extends Model
 {
@@ -12,6 +13,7 @@ class Scheduler extends Model
     protected $table = 'schedulers';
 
     protected $fillable = [
+        'uuid',
         'name',
         'type',
         'identifier',
@@ -31,4 +33,13 @@ class Scheduler extends Model
         'last_run_at' => 'datetime',
         'next_run_at' => 'datetime',
     ];
+
+    protected static function booted()
+    {
+        static::creating(function (Scheduler $scheduler) {
+            if (empty($scheduler->uuid)) {
+                $scheduler->uuid = (string) Str::orderedUuid();
+            }
+        });
+    }
 }
