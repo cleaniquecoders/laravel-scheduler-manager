@@ -16,7 +16,7 @@ class LaravelSchedulerManagerServiceProvider extends PackageServiceProvider
          * More info: https://github.com/spatie/laravel-package-tools
          */
         $package
-            ->name('laravel-scheduler-manager')
+            ->name('scheduler-manager')
             ->hasConfigFile()
             ->hasViews()
             ->hasMigration('create_schedulers_table')
