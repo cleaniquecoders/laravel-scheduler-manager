@@ -94,11 +94,9 @@ class Scheduler extends Model
      */
     public function calculateNextRunAt(?CarbonInterface $from = null): ?Carbon
     {
-        $timezone = $this->resolveTimezone();
-
         try {
             $next = (new CronExpression($this->cron))
-                ->getNextRunDate($from ?? Carbon::now($timezone));
+                ->getNextRunDate($this->toSchedulerTimezone($from));
         } catch (\Throwable) {
             return null;
         }
@@ -121,10 +119,28 @@ class Scheduler extends Model
     {
         try {
             return (new CronExpression($this->cron))
-                ->isDue($at ?? Carbon::now($this->resolveTimezone()));
+                ->isDue($this->toSchedulerTimezone($at));
         } catch (\Throwable) {
             return false;
         }
+    }
+
+    /**
+     * Re-express an instant in the scheduler's own timezone.
+     *
+     * The cron fields describe wall-clock time in that zone, and
+     * cron-expression reads them against whichever timezone the instance it is
+     * handed happens to carry. Normalising here keeps the answer tied to the
+     * instant rather than to the caller's choice of representation: passing
+     * 16:30 UTC and 00:30 Asia/Kuala_Lumpur must give the same verdict.
+     */
+    protected function toSchedulerTimezone(?CarbonInterface $moment): Carbon
+    {
+        $timezone = $this->resolveTimezone();
+
+        return $moment instanceof CarbonInterface
+            ? Carbon::instance($moment)->setTimezone($timezone)
+            : Carbon::now($timezone);
     }
 
     /**

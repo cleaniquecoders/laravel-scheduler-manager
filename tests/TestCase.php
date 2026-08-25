@@ -4,8 +4,10 @@ namespace CleaniqueCoders\LaravelSchedulerManager\Tests;
 
 use CleaniqueCoders\LaravelSchedulerManager\LaravelSchedulerManagerServiceProvider;
 use CleaniqueCoders\Traitify\TraitifyServiceProvider;
+use Flux\FluxServiceProvider;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\File;
+use Livewire\LivewireServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
 
 class TestCase extends Orchestra
@@ -22,6 +24,8 @@ class TestCase extends Orchestra
     protected function getPackageProviders($app)
     {
         return [
+            LivewireServiceProvider::class,
+            FluxServiceProvider::class,
             TraitifyServiceProvider::class,
             LaravelSchedulerManagerServiceProvider::class,
         ];
@@ -30,6 +34,7 @@ class TestCase extends Orchestra
     public function getEnvironmentSetUp($app)
     {
         config()->set('database.default', 'testing');
+        config()->set('app.key', 'base64:'.base64_encode(random_bytes(32)));
     }
 
     /**
