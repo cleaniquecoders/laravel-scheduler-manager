@@ -48,9 +48,10 @@ dispatches, so a task that runs for twenty minutes never blocks the next tick.
 - A queue worker, unless you are happy running everything on the `sync` driver
 - Livewire 3 and `livewire/flux` (free tier) — installed automatically as dependencies
 
-> **Livewire 4 is not supported.** `livewire/livewire` is pinned to `^3.7`. Livewire 4 changes
-> component resolution so explicitly registered namespaced components cannot be found, and its
-> `wire:key` precompiler emits invalid Blade for `<flux:*>` tags.
+> **Livewire 4 is not supported yet.** `livewire/livewire` is pinned to `^3.7`. Livewire 4's
+> `wire:key` precompiler injects a PHP block inside the tag it annotates, which produces invalid
+> Blade on Flux component tags. Tracked in
+> [#48](https://github.com/cleaniquecoders/laravel-scheduler-manager/issues/48).
 
 ## Installation
 

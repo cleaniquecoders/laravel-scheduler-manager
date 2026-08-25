@@ -68,7 +68,7 @@ Mark a breaking change with `!` after the type (`feat!: ...`) and explain it in 
 
 ## Code conventions
 
-- **PHP 8.4, Laravel 12, Livewire 3.** Use constructor property promotion, enums, readonly where it
+- **PHP 8.4, Laravel 12+, Livewire 3.** Use constructor property promotion, enums, readonly where it
   fits, and typed properties throughout.
 - **Pint, default Laravel preset**, no `pint.json`. Do not hand-format; run `composer format`.
 - **PHPStan level 5** with Larastan, `checkModelProperties: true`. `phpstan-baseline.neon` **must stay
@@ -92,8 +92,12 @@ Mark a breaking change with `!` after the type (`feat!: ...`) and explain it in 
   to buy a licence and configure a private repository. Verify a component exists by listing
   `vendor/livewire/flux/stubs/resources/views/flux/` rather than trusting the docs site, which does
   not publish the tier split.
-- **Do not widen `livewire/livewire` past `^3.7`.** Livewire 4 breaks component resolution and emits
-  invalid Blade for `wire:key` on Flux tags. See CLAUDE.md for the detail.
+- **Do not widen `livewire/livewire` past `^3.7` without running the suite on Livewire 4 with a
+  cleared Blade cache.** Compiled views are keyed on the Blade source, not the Livewire version, so
+  switching majors without deleting
+  `vendor/orchestra/testbench-core/laravel/storage/framework/views/*.php` reports a false green.
+  See issue #48.
+
 - **No debugging leftovers.** `tests/ArchTest.php` fails the build on `dd`, `dump` or `ray` anywhere
   in the codebase.
 
