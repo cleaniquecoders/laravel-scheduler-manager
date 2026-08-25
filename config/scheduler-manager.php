@@ -76,4 +76,40 @@ return [
      * scheduled tasks typically run longer than the default.
      */
     'lock_ttl' => 3600,
+
+    // Execution policy ------------------------------------------------------
+    /**
+     * Optional allow-list of Artisan commands that may be scheduled. An empty
+     * array permits any registered command. Populate it to restrict which
+     * commands operators can trigger through this package.
+     */
+    'allowed_commands' => [],
+
+    // Retention --------------------------------------------------------------
+    /**
+     * How many days of run history to keep. `scheduler-manager:prune` deletes
+     * anything older. A scheduler on "* * * * *" writes 1,440 rows a day, so
+     * without pruning the scheduler_runs table grows without bound.
+     */
+    'retention_days' => 30,
+
+    /**
+     * Runs to always keep per scheduler regardless of age, so history is never
+     * left completely empty for a rarely-run task.
+     */
+    'retention_keep_last' => 10,
+
+    /**
+     * A run still marked "running" after this many seconds is treated as
+     * abandoned by `scheduler-manager:reap`. A worker killed mid-job (OOM,
+     * deploy, container restart) never reaches its finally block, so the row
+     * would otherwise stay "running" forever.
+     */
+    'stale_run_threshold' => 3600,
+
+    /**
+     * Have the tick command reap stale runs opportunistically, so no extra
+     * cron entry is required.
+     */
+    'reap_on_tick' => true,
 ];

@@ -2,8 +2,10 @@
 
 namespace CleaniqueCoders\LaravelSchedulerManager\Models;
 
+use Carbon\CarbonInterface;
 use CleaniqueCoders\LaravelSchedulerManager\Enums\SchedulerType;
 use CleaniqueCoders\Traitify\Concerns\InteractsWithUuid;
+use Cron\CronExpression;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -72,6 +74,57 @@ class Scheduler extends Model
     public function latestRun(): HasOne
     {
         return $this->hasOne(SchedulerRun::class)->latestOfMany('started_at');
+    }
+
+    protected static function booted(): void
+    {
+        static::saving(function (Scheduler $scheduler) {
+            if ($scheduler->isDirty(['cron', 'timezone']) || is_null($scheduler->next_run_at)) {
+                $scheduler->next_run_at = $scheduler->calculateNextRunAt();
+            }
+        });
+    }
+
+    /**
+     * When this scheduler is next due, or null if the cron cannot be parsed.
+     *
+     * Stored in the application timezone: Eloquent serialises a Carbon using
+     * that object's own timezone, so a scheduler-timezone instance would be
+     * written as local wall-clock and read back as application time.
+     */
+    public function calculateNextRunAt(?CarbonInterface $from = null): ?Carbon
+    {
+        $timezone = $this->resolveTimezone();
+
+        try {
+            $next = (new CronExpression($this->cron))
+                ->getNextRunDate($from ?? Carbon::now($timezone));
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return Carbon::instance($next)->setTimezone(config('app.timezone', 'UTC'));
+    }
+
+    /**
+     * Whether the stored cron expression can be parsed.
+     */
+    public function isCronValid(): bool
+    {
+        return CronExpression::isValidExpression((string) $this->cron);
+    }
+
+    /**
+     * Whether this scheduler is due at the given moment.
+     */
+    public function isDue(?CarbonInterface $at = null): bool
+    {
+        try {
+            return (new CronExpression($this->cron))
+                ->isDue($at ?? Carbon::now($this->resolveTimezone()));
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     /**

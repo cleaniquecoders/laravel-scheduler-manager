@@ -2,10 +2,9 @@
 
 namespace CleaniqueCoders\LaravelSchedulerManager\Console;
 
-use Carbon\Carbon;
+use CleaniqueCoders\LaravelSchedulerManager\Actions\ReapStaleRuns;
 use CleaniqueCoders\LaravelSchedulerManager\Jobs\RunSchedulerJob;
 use CleaniqueCoders\LaravelSchedulerManager\Models\Scheduler;
-use Cron\CronExpression;
 use Illuminate\Console\Command;
 
 class TickCommand extends Command
@@ -16,20 +15,26 @@ class TickCommand extends Command
 
     public function handle(): int
     {
-        Scheduler::query()->enabled()->each(function (Scheduler $scheduler) {
-            try {
-                $cron = new CronExpression($scheduler->cron);
-                $due = $cron->isDue(Carbon::now($scheduler->resolveTimezone()));
-            } catch (\Throwable $e) {
-                $this->error('Invalid cron for scheduler '.$scheduler->id.': '.$e->getMessage());
+        if (config('scheduler-manager.reap_on_tick', true)) {
+            (new ReapStaleRuns)->execute();
+        }
+
+        $dispatched = 0;
+
+        Scheduler::query()->enabled()->each(function (Scheduler $scheduler) use (&$dispatched) {
+            if (! $scheduler->isCronValid()) {
+                $this->error("Invalid cron for scheduler {$scheduler->id}: {$scheduler->cron}");
 
                 return;
             }
 
-            if ($due) {
+            if ($scheduler->isDue()) {
                 RunSchedulerJob::dispatch($scheduler);
+                $dispatched++;
             }
         });
+
+        $this->info("Dispatched {$dispatched} scheduler(s).");
 
         return self::SUCCESS;
     }
