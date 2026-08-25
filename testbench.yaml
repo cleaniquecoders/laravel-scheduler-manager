@@ -1,0 +1,12 @@
+# Read by Orchestra Testbench and, importantly, by Larastan's ApplicationResolver.
+#
+# Larastan builds a Testbench application to answer container questions during
+# analysis. `view-string` validation calls view()->exists() against that app, so
+# without the package provider registered the "scheduler-manager::" namespace is
+# unknown and every Livewire render() call is reported as an invalid view-string.
+#
+# This file must stay tracked in git. It was previously excluded by .gitignore,
+# which made PHPStan pass locally (where a stale discovery cache happened to
+# contain the provider) and fail in CI on a clean clone.
+providers:
+  - CleaniqueCoders\LaravelSchedulerManager\LaravelSchedulerManagerServiceProvider
