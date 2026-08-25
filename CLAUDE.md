@@ -127,12 +127,15 @@ No Flux Pro component may be used — `livewire/flux-pro` is not on Packagist at
 the private `composer.fluxui.dev` repository against per-licence credentials), so a Pro component
 would force every consumer to buy a licence and CI to hold licence secrets.
 
-**Pin `livewire/livewire` to `^3.7`, never `^4.0`.** Flux `^2.17` permits `^3.7.4|^4.0`, but Livewire
-4 breaks this package in two ways: `Livewire\Finder` treats everything before `::` as a namespace and
-ignores the explicitly registered component map, so every screen dies with `Unable to find component:
-[scheduler-manager::dashboard]`; and `wire:key` on any `<flux:*>` tag makes Blade emit an unbalanced
-`endif`, because Livewire 4's `SupportCompiledWireKeys` precompiler injects `<?php ?>` into the tag
-before the component compiler sees it.
+**Both Livewire majors are supported** (`^3.7|^4.0`), and CI exercises both.
+
+Livewire 4 resolves a namespaced alias such as `scheduler-manager::dashboard` *exclusively* through
+its registered class namespaces — `Finder::resolveClassComponentClassName()` returns `null` without
+ever consulting the explicit `classComponents` map. So `Livewire::component()` alone, which is all
+Livewire 3 needs, leaves every screen unresolvable on 4. The provider therefore also calls
+`addNamespace('scheduler-manager', classNamespace: ...)`, which exists only on Livewire 4 — hence the
+`method_exists` check against `Livewire::getFacadeRoot()` rather than the static proxy, which would
+not type-check against Livewire 3.
 
 **`phpstan-baseline.neon` must stay empty.** Level 5 with `checkModelProperties: true` and
 `checkOctaneCompatibility: true` over `src`, `config`, `database`. Fix findings; never baseline them.

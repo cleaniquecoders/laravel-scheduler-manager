@@ -30,6 +30,10 @@ jobs:
         # composer.json requires php ^8.4, which spans 8.4 and 8.5.
         php: [8.4, 8.5]
         laravel: [12.*, 13.*]
+        # Both Livewire majors are supported, so both are exercised. Livewire 4
+        # resolves namespaced component aliases differently and would otherwise
+        # regress silently.
+        livewire: ['3.*', '4.*']
         stability: [prefer-stable]
         include:
           - laravel: 12.*
@@ -39,7 +43,7 @@ jobs:
             testbench: 11.*
             carbon: ^3.0
 
-    name: P${{ matrix.php }} - L${{ matrix.laravel }} - ${{ matrix.stability }}
+    name: P${{ matrix.php }} - L${{ matrix.laravel }} - LW${{ matrix.livewire }}
 
     steps:
       - name: Checkout code
@@ -59,7 +63,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          composer require "laravel/framework:${{ matrix.laravel }}" "nesbot/carbon:${{ matrix.carbon }}" --no-interaction --no-update
+          composer require "laravel/framework:${{ matrix.laravel }}" "nesbot/carbon:${{ matrix.carbon }}" "livewire/livewire:${{ matrix.livewire }}" --no-interaction --no-update
           composer require "orchestra/testbench:${{ matrix.testbench }}" --dev --no-interaction --no-update
           composer update --${{ matrix.stability }} --prefer-dist --no-interaction
 
