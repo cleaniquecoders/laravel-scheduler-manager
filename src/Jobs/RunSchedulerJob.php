@@ -2,8 +2,13 @@
 
 namespace CleaniqueCoders\LaravelSchedulerManager\Jobs;
 
+use CleaniqueCoders\LaravelSchedulerManager\Contracts\Runner;
+use CleaniqueCoders\LaravelSchedulerManager\Data\RunResult;
 use CleaniqueCoders\LaravelSchedulerManager\Enums\RunStatus;
-use CleaniqueCoders\LaravelSchedulerManager\Enums\SchedulerType;
+use CleaniqueCoders\LaravelSchedulerManager\Events\SchedulerRunFailed;
+use CleaniqueCoders\LaravelSchedulerManager\Events\SchedulerRunSkipped;
+use CleaniqueCoders\LaravelSchedulerManager\Events\SchedulerRunStarted;
+use CleaniqueCoders\LaravelSchedulerManager\Events\SchedulerRunSucceeded;
 use CleaniqueCoders\LaravelSchedulerManager\Models\Scheduler;
 use CleaniqueCoders\LaravelSchedulerManager\Models\SchedulerRun;
 use Illuminate\Bus\Queueable;
@@ -12,10 +17,14 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\App;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * Orchestrates one scheduler execution: run bookkeeping, overlap locking and
+ * event dispatch. The work itself belongs to the runner for the scheduler's
+ * type, so adding a new type never means editing this class.
+ */
 class RunSchedulerJob implements ShouldQueue
 {
     use Dispatchable, Queueable, SerializesModels;
@@ -26,7 +35,9 @@ class RunSchedulerJob implements ShouldQueue
     {
         $scheduler = $this->scheduler->fresh();
 
-        $payload = (array) ($scheduler->payload ?? []);
+        if (! $scheduler instanceof Scheduler) {
+            return;
+        }
 
         $run = SchedulerRun::create([
             'scheduler_id' => $scheduler->id,
@@ -34,94 +45,80 @@ class RunSchedulerJob implements ShouldQueue
             'status' => RunStatus::Running,
         ]);
 
-        $lockKey = "scheduler_manager:{$scheduler->id}:lock";
-        $lockTtl = config('scheduler-manager.lock_ttl', 3600);
+        SchedulerRunStarted::dispatch($scheduler, $run);
 
-        $lock = null;
-        if ($scheduler->prevent_overlap) {
-            $lock = Cache::lock($lockKey, $lockTtl);
+        $lock = $this->acquireLock($scheduler);
 
-            if (! $lock->get()) {
-                // Nothing failed here: an earlier run is still holding the lock,
-                // so this tick is deliberately suppressed.
-                $run->update([
-                    'finished_at' => now(),
-                    'status' => RunStatus::Skipped,
-                    'exception' => 'Could not obtain lock: overlapping prevented',
-                ]);
+        if ($lock === false) {
+            $this->finish($scheduler, $run, RunResult::skipped(
+                'Could not obtain lock: overlapping prevented'
+            ));
 
-                return;
-            }
+            return;
         }
 
         try {
-            if ($scheduler->type === SchedulerType::Artisan) {
-                $exit = Artisan::call($scheduler->identifier, $payload);
-
-                $run->update([
-                    'finished_at' => now(),
-                    'status' => $exit === 0 ? RunStatus::Success : RunStatus::Failed,
-                    'exit_code' => $exit,
-                    'output' => Artisan::output(),
-                ]);
-            } else {
-                $result = $this->runAction($scheduler->identifier, $payload);
-
-                $run->update([
-                    'finished_at' => now(),
-                    'status' => RunStatus::Success,
-                    'exit_code' => 0,
-                    'output' => is_string($result) ? $result : json_encode($result),
-                ]);
-            }
-
-            $scheduler->update(['last_run_at' => now()]);
+            $result = $this->runnerFor($scheduler)->execute()->result();
         } catch (\Throwable $e) {
             Log::error('RunSchedulerJob exception: '.$e->getMessage(), ['exception' => $e]);
 
-            $run->update([
-                'finished_at' => now(),
-                'status' => RunStatus::Failed,
-                'exit_code' => null,
-                'output' => null,
-                'exception' => (string) $e,
-            ]);
+            $result = RunResult::failed((string) $e);
         } finally {
             if ($lock instanceof Lock) {
                 $lock->release();
             }
         }
+
+        $this->finish($scheduler, $run, $result);
+    }
+
+    protected function runnerFor(Scheduler $scheduler): Runner
+    {
+        /** @var Runner $runner */
+        $runner = App::make($scheduler->type->runner());
+
+        return $runner->for($scheduler);
     }
 
     /**
-     * Resolve and invoke a configured action.
+     * Returns the acquired lock, false when overlapping is prevented and the
+     * lock is already held, or null when overlap protection is off.
      */
-    protected function runAction(string $identifier, array $payload): mixed
+    protected function acquireLock(Scheduler $scheduler): Lock|false|null
     {
-        $actions = config('scheduler-manager.actions', []);
-        $action = $actions[$identifier] ?? $identifier;
-
-        // The whitelist may map straight to a closure or callable array.
-        if (! is_string($action)) {
-            if (! is_callable($action)) {
-                throw new \RuntimeException('Configured action is not callable: '.$identifier);
-            }
-
-            return App::call($action, $payload);
+        if (! $scheduler->prevent_overlap) {
+            return null;
         }
 
-        $instance = App::make($action);
+        $lock = Cache::lock(
+            "scheduler_manager:{$scheduler->id}:lock",
+            config('scheduler-manager.lock_ttl', 3600)
+        );
 
-        // Both branches go through App::call so the container can inject
-        // dependencies alongside the payload arguments.
-        if (method_exists($instance, 'handle')) {
-            return App::call([$instance, 'handle'], $payload);
+        return $lock->get() ? $lock : false;
+    }
+
+    protected function finish(Scheduler $scheduler, SchedulerRun $run, RunResult $result): void
+    {
+        $run->update([
+            'status' => $result->status,
+            'exit_code' => $result->exitCode,
+            'output' => $result->output,
+            'exception' => $result->exception,
+            'finished_at' => now(),
+        ]);
+
+        if ($result->status !== RunStatus::Skipped) {
+            $scheduler->forceFill([
+                'last_run_at' => now(),
+                'next_run_at' => $scheduler->calculateNextRunAt(),
+            ])->save();
         }
 
-        if (method_exists($instance, '__invoke')) {
-            return App::call([$instance, '__invoke'], $payload);
-        }
-
-        throw new \RuntimeException('Action is not invokable: '.get_class($instance));
+        match ($result->status) {
+            RunStatus::Success => SchedulerRunSucceeded::dispatch($scheduler, $run),
+            RunStatus::Skipped => SchedulerRunSkipped::dispatch($scheduler, $run),
+            default => SchedulerRunFailed::dispatch($scheduler, $run),
+        };
     }
 }
