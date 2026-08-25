@@ -5,6 +5,38 @@ All notable changes to `laravel-scheduler-manager` will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2.0.0 - 2026-08-25
+
+**Breaking release.** This package now targets **Livewire 4 exclusively**. Applications still on Livewire 3 should stay on `1.0.x`.
+
+### Breaking
+
+- `livewire/livewire` moves from `^3.7` to `^4.0`.
+
+### Fixed
+
+Livewire 4 previously did not work at all. Two separate problems, both now resolved.
+
+**Component resolution.** Livewire resolves a namespaced alias such as `scheduler-manager::dashboard` *solely* through registered class namespaces — `Finder::resolveClassComponentClassName()` returns `null` the moment it sees `::`, without ever consulting the explicit component map that `Livewire::component()` fills. Every screen was unresolvable. The service provider now calls `Livewire::addNamespace()`, unconditionally rather than behind the `method_exists` guard that 1.0.1 needed for Livewire 3 compatibility.
+
+**Invalid Blade on Flux tags.** `SupportCompiledWireKeys` precompiles `wire:key` by injecting a `<?php ?>` block immediately before the attribute — that is, *inside* the tag. On a Blade component tag such as `<flux:table.row wire:key="...">` the component compiler then emitted invalid PHP and the view died with `syntax error, unexpected token "endif"`, taking 66 of 233 tests with it.
+
+`wire:key` is removed from every `<flux:*>` tag. Livewire 4 derives loop keys itself through `livewire.smart_wire_keys`, so the attribute was redundant. This is the change that **required** dropping Livewire 3: Livewire 3 has no smart-key fallback, so a keyless loop there risks DOM-diffing bugs. `wire:key` on plain HTML elements is untouched.
+
+All three table views now carry a Blade comment recording why the attribute must not come back.
+
+### Note for contributors
+
+Compiled Blade views are cached keyed on the Blade **source**, not on the Livewire version. A test run after changing Livewire or the views will happily reuse views compiled by the previous configuration and report a false green — this once turned a real 66-failed into a reported 233-passed. Delete `vendor/orchestra/testbench-core/laravel/storage/framework/views/*.php` before trusting such a run. Documented in `CLAUDE.md` and `CONTRIBUTING.md`.
+
+### Unchanged
+
+PHP 8.4/8.5, Laravel 12/13, Flux free tier, and the whole scheduling engine, commands, events and security model are as in 1.0.1.
+
+Verified from a cold Blade cache on Livewire v4.4.2: 233 tests, 557 assertions, PHPStan level 5 clean with an empty baseline, Pint clean, and all four CI cells green.
+
+**Full Changelog**: https://github.com/cleaniquecoders/laravel-scheduler-manager/compare/1.0.1...2.0.0
+
 ## 1.0.1 - 2026-08-25
 
 Patch release. No behaviour change on Livewire 3; groundwork and documentation corrections toward Livewire 4.
@@ -84,6 +116,7 @@ use Illuminate\Support\Facades\Schedule;
 
 Schedule::command('scheduler-manager:tick')->everyMinute();
 Schedule::command('scheduler-manager:prune')->daily();
+
 
 
 ```
