@@ -1,41 +1,74 @@
 <?php
 
-namespace CleaniqueCoders\LaravelSchedulerManager\Tests\Feature;
-
+use CleaniqueCoders\LaravelSchedulerManager\Jobs\RunSchedulerJob;
 use CleaniqueCoders\LaravelSchedulerManager\Models\Scheduler;
-use CleaniqueCoders\LaravelSchedulerManager\Models\SchedulerRun;
-use CleaniqueCoders\LaravelSchedulerManager\Tests\TestCase;
+use Illuminate\Support\Facades\Queue;
 
-class TickCommandTest extends TestCase
-{
-    protected function setUp(): void
-    {
-        parent::setUp();
+it('dispatches a job for a due scheduler', function () {
+    Queue::fake();
 
-        // Run package migrations
-        foreach (\Illuminate\Support\Facades\File::allFiles(__DIR__.'/../../database/migrations') as $migration) {
-            (include $migration->getRealPath())->up();
-        }
-    }
+    $scheduler = Scheduler::factory()->create(['cron' => '* * * * *']);
 
-    public function test_tick_dispatches_job_for_due_scheduler()
-    {
-        $scheduler = Scheduler::create([
-            'name' => 'Tick Test',
-            'type' => 'artisan',
-            'identifier' => 'cache:clear',
-            'payload' => null,
-            'cron' => '* * * * *',
-            'timezone' => config('app.timezone'),
-            'enabled' => true,
-            'prevent_overlap' => false,
-        ]);
+    $this->artisan('scheduler-manager:tick')->assertSuccessful();
 
-        // Run the command synchronously
-        $this->artisan('scheduler-manager:tick');
+    Queue::assertPushed(
+        RunSchedulerJob::class,
+        fn (RunSchedulerJob $job) => $job->scheduler->is($scheduler)
+    );
+});
 
-        $run = SchedulerRun::where('scheduler_id', $scheduler->id)->first();
+it('does not dispatch a scheduler that is not due', function () {
+    Queue::fake();
 
-        $this->assertNotNull($run);
-    }
-}
+    Carbon\Carbon::setTestNow('2026-01-01 10:30:00');
+
+    Scheduler::factory()->create(['cron' => '0 0 * * *']);
+
+    $this->artisan('scheduler-manager:tick')->assertSuccessful();
+
+    Queue::assertNothingPushed();
+});
+
+it('does not dispatch a disabled scheduler', function () {
+    Queue::fake();
+
+    Scheduler::factory()->disabled()->create();
+
+    $this->artisan('scheduler-manager:tick')->assertSuccessful();
+
+    Queue::assertNothingPushed();
+});
+
+it('skips an invalid cron without aborting the remaining schedulers', function () {
+    Queue::fake();
+
+    Scheduler::factory()->create(['cron' => 'not-a-cron']);
+    $valid = Scheduler::factory()->create(['cron' => '* * * * *']);
+
+    $this->artisan('scheduler-manager:tick')->assertSuccessful();
+
+    Queue::assertPushed(
+        RunSchedulerJob::class,
+        fn (RunSchedulerJob $job) => $job->scheduler->is($valid)
+    );
+    Queue::assertPushed(RunSchedulerJob::class, 1);
+});
+
+it('evaluates the cron in the scheduler timezone', function () {
+    Queue::fake();
+
+    // 00:30 in Kuala Lumpur is 16:30 UTC the previous day.
+    Carbon\Carbon::setTestNow('2026-01-01 16:30:00');
+    config()->set('app.timezone', 'UTC');
+
+    $kl = Scheduler::factory()->timezone('Asia/Kuala_Lumpur')->cron('30 0 * * *')->create();
+    Scheduler::factory()->timezone('UTC')->cron('30 0 * * *')->create();
+
+    $this->artisan('scheduler-manager:tick')->assertSuccessful();
+
+    Queue::assertPushed(RunSchedulerJob::class, 1);
+    Queue::assertPushed(
+        RunSchedulerJob::class,
+        fn (RunSchedulerJob $job) => $job->scheduler->is($kl)
+    );
+});
