@@ -112,4 +112,44 @@ return [
      * cron entry is required.
      */
     'reap_on_tick' => true,
+
+    // User interface --------------------------------------------------------
+    /**
+     * Register the package routes and Livewire components. Disable this to
+     * install the scheduling engine alone, with no HTTP surface at all.
+     *
+     * The UI is built on the free tier of Flux (https://fluxui.dev). Flux is
+     * intentionally not a hard dependency of this package: install
+     * livewire/flux yourself when you want the UI, or publish the views with
+     * `--tag=scheduler-manager-views` and restyle them.
+     */
+    'ui' => [
+        'enabled' => true,
+
+        /**
+         * Prefix applied to package route names, so they cannot collide with
+         * routes in the host application.
+         */
+        'route_name_prefix' => 'scheduler-manager.',
+
+        /**
+         * The Blade layout package views extend. Point this at your own
+         * application layout to have the UI inherit your chrome.
+         */
+        'layout' => 'scheduler-manager::layouts.app',
+
+        /**
+         * Rows per page on the listing screens.
+         */
+        'per_page' => 15,
+    ],
+
+    // Authorization ----------------------------------------------------------
+    /**
+     * Gate ability checked before any scheduler screen or action. The package
+     * denies by default: this UI can execute arbitrary Artisan commands on the
+     * host, so "any authenticated user" is not a safe default. Define the
+     * ability in your AuthServiceProvider to grant access.
+     */
+    'gate' => 'manage-schedulers',
 ];
