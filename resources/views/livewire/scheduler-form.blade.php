@@ -1,3 +1,11 @@
+{{--
+    Do not put wire:key on a <flux:*> tag. Livewire's SupportCompiledWireKeys
+    precompiler injects a <?php ?> block immediately before the attribute, i.e.
+    inside the tag, and the Blade component compiler then emits invalid PHP:
+    "syntax error, unexpected token endif". Livewire 4 derives loop keys itself
+    (config livewire.smart_wire_keys, on by default), so the manual attribute is
+    redundant here. On a plain HTML element wire:key is still fine.
+--}}
 @php
     $routes = config('scheduler-manager.ui.route_name_prefix', 'scheduler-manager.');
     $editing = (bool) $scheduler?->exists;
@@ -97,7 +105,6 @@
                     <flux:button
                         size="sm"
                         type="button"
-                        wire:key="preset-{{ \Illuminate\Support\Str::slug($label) }}"
                         wire:click="applyPreset('{{ $expression }}')"
                         :variant="$cron === $expression ? 'primary' : 'outline'"
                     >

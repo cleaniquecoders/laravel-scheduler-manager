@@ -100,20 +100,15 @@ class LaravelSchedulerManagerServiceProvider extends PackageServiceProvider
             return;
         }
 
-        // Livewire 4 resolves a namespaced alias ("scheduler-manager::foo")
-        // exclusively through its registered class namespaces and never falls
-        // back to the explicit component map, so Livewire::component() alone
-        // leaves every screen unresolvable there. addNamespace() exists only on
-        // Livewire 4, hence the call through the facade root rather than the
-        // static proxy, which would not type-check against Livewire 3.
-        $manager = Livewire::getFacadeRoot();
-
-        if (is_object($manager) && method_exists($manager, 'addNamespace')) {
-            $manager->addNamespace(
-                'scheduler-manager',
-                classNamespace: __NAMESPACE__.'\\Livewire',
-            );
-        }
+        // Livewire resolves a namespaced alias such as "scheduler-manager::foo"
+        // exclusively through its registered class namespaces:
+        // Finder::resolveClassComponentClassName() returns null once it sees a
+        // "::" without ever consulting the explicit component map. Registering
+        // the namespace is therefore required, not merely an optimisation.
+        Livewire::addNamespace(
+            'scheduler-manager',
+            classNamespace: __NAMESPACE__.'\\Livewire',
+        );
 
         foreach (static::COMPONENTS as $alias => $class) {
             Livewire::component($alias, $class);

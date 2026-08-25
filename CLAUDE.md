@@ -127,22 +127,25 @@ No Flux Pro component may be used — `livewire/flux-pro` is not on Packagist at
 the private `composer.fluxui.dev` repository against per-licence credentials), so a Pro component
 would force every consumer to buy a licence and CI to hold licence secrets.
 
-**`livewire/livewire` is pinned to `^3.7`. Livewire 4 does not work yet.** Two separate problems:
+**Livewire 4 only** (`^4.0`). Two things follow from that, both load-bearing:
 
-1. Livewire 4 resolves a namespaced alias such as `scheduler-manager::dashboard` *exclusively*
-   through registered class namespaces — `Finder::resolveClassComponentClassName()` returns `null`
-   without ever consulting the explicit `classComponents` map. The provider already works around
-   this by also calling `addNamespace()` behind a `method_exists` check on the facade root, so this
-   part is solved.
-2. **Unsolved.** `SupportCompiledWireKeys` precompiles `wire:key` by `str_replace`-ing a
-   `<?php ... ?>` block immediately *before the attribute*, i.e. inside the tag. On a Blade
-   component tag such as `<flux:table.row wire:key="...">` the component compiler then emits
-   invalid PHP, and the view dies with `syntax error, unexpected token "endif"`. It is upstream
-   behaviour, not something to paper over. Tracked in issue #48.
+1. The provider must call `Livewire::addNamespace('scheduler-manager', classNamespace: ...)`. Livewire
+   resolves a namespaced alias *exclusively* through registered class namespaces —
+   `Finder::resolveClassComponentClassName()` returns `null` once it sees `::` without ever
+   consulting the explicit component map that `Livewire::component()` fills. Without the
+   registration every screen is unresolvable.
+2. **Never put `wire:key` on a `<flux:*>` tag.** `SupportCompiledWireKeys` precompiles it by
+   injecting a `<?php ?>` block immediately before the attribute, i.e. *inside* the tag, and the
+   Blade component compiler then emits invalid PHP — the view dies with
+   `syntax error, unexpected token "endif"`. Livewire 4 derives loop keys itself
+   (`livewire.smart_wire_keys`, on by default), so the manual attribute is redundant. On a plain HTML
+   element it is still fine, and the dashboard uses it on `<li>`. All three table views carry a Blade
+   comment saying so.
 
-**Clear the compiled Blade cache when testing across Livewire majors.** Compiled views are keyed on
-the Blade source, not on the Livewire version, so a suite run after switching majors will happily
-reuse views compiled by the other one and report a false green. Delete
+**Clear the compiled Blade cache when changing anything about Livewire or the views.** Compiled views
+are keyed on the Blade source, not on the Livewire version, so a suite run after switching majors
+reuses views compiled by the other one and reports a false green — that mistake once turned a real
+66-failed into a reported 233-passed. Delete
 `vendor/orchestra/testbench-core/laravel/storage/framework/views/*.php` first.
 
 **`phpstan-baseline.neon` must stay empty.** Level 5 with `checkModelProperties: true` and

@@ -1,3 +1,11 @@
+{{--
+    Do not put wire:key on a <flux:*> tag. Livewire's SupportCompiledWireKeys
+    precompiler injects a <?php ?> block immediately before the attribute, i.e.
+    inside the tag, and the Blade component compiler then emits invalid PHP:
+    "syntax error, unexpected token endif". Livewire 4 derives loop keys itself
+    (config livewire.smart_wire_keys, on by default), so the manual attribute is
+    redundant here. On a plain HTML element wire:key is still fine.
+--}}
 @php
     $routes = config('scheduler-manager.ui.route_name_prefix', 'scheduler-manager.');
 
@@ -75,7 +83,7 @@
                     @foreach ($runs as $run)
                         @php($isExpanded = $expanded === $run->id)
 
-                        <flux:table.row wire:key="run-{{ $run->id }}">
+                        <flux:table.row>
                             <flux:table.cell>
                                 <span title="{{ $run->started_at?->toDayDateTimeString() }}">
                                     {{ $run->started_at?->format('Y-m-d H:i:s') ?? '—' }}
@@ -127,7 +135,7 @@
                         </flux:table.row>
 
                         @if ($isExpanded)
-                            <flux:table.row wire:key="run-detail-{{ $run->id }}">
+                            <flux:table.row>
                                 <flux:table.cell colspan="{{ $scheduler ? 5 : 6 }}">
                                     <div class="space-y-4 whitespace-normal py-2">
                                         <div>
