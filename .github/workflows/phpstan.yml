@@ -2,10 +2,15 @@ name: PHPStan
 
 on:
   push:
-    paths:
+    paths: &paths
       - '**.php'
       - 'phpstan.neon.dist'
+      - 'testbench.yaml'
       - '.github/workflows/phpstan.yml'
+  # Without a pull_request trigger PHPStan never gates a PR, only the push that
+  # follows the merge - which is how four errors reached main in #43.
+  pull_request:
+    paths: *paths
 
 jobs:
   phpstan:
