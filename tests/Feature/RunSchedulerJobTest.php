@@ -1,78 +1,49 @@
 <?php
 
-namespace CleaniqueCoders\LaravelSchedulerManager\Tests\Feature;
-
+use CleaniqueCoders\LaravelSchedulerManager\Enums\RunStatus;
 use CleaniqueCoders\LaravelSchedulerManager\Jobs\RunSchedulerJob;
 use CleaniqueCoders\LaravelSchedulerManager\Models\Scheduler;
-use CleaniqueCoders\LaravelSchedulerManager\Models\SchedulerRun;
-use CleaniqueCoders\LaravelSchedulerManager\Tests\TestCase;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 
-class RunSchedulerJobTest extends TestCase
-{
-    protected function setUp(): void
-    {
-        parent::setUp();
+it('runs an artisan command and records the output', function () {
+    $scheduler = Scheduler::factory()->create(['identifier' => 'cache:clear']);
 
-        // Run migrations from package stubs
-        foreach (\Illuminate\Support\Facades\File::allFiles(__DIR__.'/../../database/migrations') as $migration) {
-            (include $migration->getRealPath())->up();
-        }
-    }
+    (new RunSchedulerJob($scheduler))->handle();
 
-    public function test_artisan_command_runs_and_records_output()
-    {
-        // Use a simple artisan command that exists: 'list' is safe but outputs many lines.
-        $scheduler = Scheduler::create([
-            'name' => 'Test Artisan',
-            'type' => 'artisan',
-            'identifier' => 'cache:clear',
-            'payload' => null,
-            'cron' => '* * * * *',
-            'timezone' => config('app.timezone'),
-            'enabled' => true,
-            'prevent_overlap' => false,
-        ]);
+    $run = $scheduler->runs()->first();
 
-        // Dispatch job synchronously
-        (new RunSchedulerJob($scheduler))->handle();
+    expect($run)->not->toBeNull()
+        ->and($run->status)->toBe(RunStatus::Success)
+        ->and($run->finished_at)->not->toBeNull()
+        ->and($run->exit_code)->toBe(0)
+        ->and($run->output)->toBeString();
 
-        $run = SchedulerRun::where('scheduler_id', $scheduler->id)->first();
+    expect($scheduler->fresh()->last_run_at)->not->toBeNull();
+});
 
-        $this->assertNotNull($run);
-        $this->assertEquals('success', $run->status);
-        $this->assertNotNull($run->finished_at);
-        $this->assertIsString($run->output);
-    }
+it('marks the run as skipped when an overlapping run holds the lock', function () {
+    $scheduler = Scheduler::factory()->preventingOverlap()->create();
 
-    public function test_prevent_overlap_records_failed_when_lock_unavailable()
-    {
-        $scheduler = Scheduler::create([
-            'name' => 'Test Prevent Overlap',
-            'type' => 'artisan',
-            'identifier' => 'cache:clear',
-            'payload' => null,
-            'cron' => '* * * * *',
-            'timezone' => config('app.timezone'),
-            'enabled' => true,
-            'prevent_overlap' => true,
-        ]);
+    $lock = Cache::lock("scheduler_manager:{$scheduler->id}:lock", 300);
+    $lock->get();
 
-        // create a lock so the job cannot obtain it
-        $lockKey = "scheduler_manager:{$scheduler->id}:lock";
-        $lock = Cache::lock($lockKey, 300);
-        $lock->get();
+    (new RunSchedulerJob($scheduler))->handle();
 
-        (new RunSchedulerJob($scheduler))->handle();
+    $run = $scheduler->runs()->first();
 
-        $run = SchedulerRun::where('scheduler_id', $scheduler->id)->first();
+    expect($run->status)->toBe(RunStatus::Skipped)
+        ->and($run->exception)->toContain('overlapping prevented');
 
-        $this->assertNotNull($run);
-        $this->assertEquals('failed', $run->status);
-        $this->assertStringContainsString('overlapping prevented', $run->exception);
+    $lock->release();
+});
 
-        // release lock
-        $lock->release();
-    }
-}
+it('records a failed run when the action cannot be resolved', function () {
+    $scheduler = Scheduler::factory()->action('does-not-exist')->create();
+
+    (new RunSchedulerJob($scheduler))->handle();
+
+    $run = $scheduler->runs()->first();
+
+    expect($run->status)->toBe(RunStatus::Failed)
+        ->and($run->exception)->not->toBeNull();
+});

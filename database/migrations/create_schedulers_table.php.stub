@@ -14,7 +14,7 @@ return new class {
             $table->string('identifier');
             $table->json('payload')->nullable();
             $table->string('cron')->default('* * * * *');
-            $table->string('timezone')->default(config('app.timezone'));
+            $table->string('timezone')->nullable();
             $table->boolean('enabled')->default(true);
             $table->boolean('prevent_overlap')->default(false);
             $table->timestamp('last_run_at')->nullable();
@@ -28,7 +28,7 @@ return new class {
             $table->unsignedBigInteger('scheduler_id');
             $table->timestamp('started_at')->nullable();
             $table->timestamp('finished_at')->nullable();
-            $table->enum('status', ['running', 'success', 'failed'])->default('running');
+            $table->enum('status', ['running', 'success', 'failed', 'skipped'])->default('running');
             $table->integer('exit_code')->nullable();
             $table->text('output')->nullable();
             $table->text('exception')->nullable();

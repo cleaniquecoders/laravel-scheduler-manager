@@ -3,7 +3,9 @@
 namespace CleaniqueCoders\LaravelSchedulerManager\Tests;
 
 use CleaniqueCoders\LaravelSchedulerManager\LaravelSchedulerManagerServiceProvider;
+use CleaniqueCoders\Traitify\TraitifyServiceProvider;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Facades\File;
 use Orchestra\Testbench\TestCase as Orchestra;
 
 class TestCase extends Orchestra
@@ -20,6 +22,7 @@ class TestCase extends Orchestra
     protected function getPackageProviders($app)
     {
         return [
+            TraitifyServiceProvider::class,
             LaravelSchedulerManagerServiceProvider::class,
         ];
     }
@@ -27,11 +30,17 @@ class TestCase extends Orchestra
     public function getEnvironmentSetUp($app)
     {
         config()->set('database.default', 'testing');
+    }
 
-        /*
-         foreach (\Illuminate\Support\Facades\File::allFiles(__DIR__ . '/database/migrations') as $migration) {
+    /**
+     * The package ships its migrations as .stub files so they can be published
+     * with a timestamp, which means the framework migrator cannot discover them.
+     * Include and run them directly instead.
+     */
+    protected function defineDatabaseMigrations(): void
+    {
+        foreach (File::allFiles(__DIR__.'/../database/migrations') as $migration) {
             (include $migration->getRealPath())->up();
-         }
-         */
+        }
     }
 }

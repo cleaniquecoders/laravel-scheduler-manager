@@ -16,25 +16,21 @@ class TickCommand extends Command
 
     public function handle(): int
     {
-        $now = Carbon::now();
-
-        $schedulers = Scheduler::where('enabled', true)->get();
-
-        foreach ($schedulers as $scheduler) {
+        Scheduler::query()->enabled()->each(function (Scheduler $scheduler) {
             try {
                 $cron = new CronExpression($scheduler->cron);
-                $due = $cron->isDue($now->toDateTimeString());
+                $due = $cron->isDue(Carbon::now($scheduler->resolveTimezone()));
             } catch (\Throwable $e) {
                 $this->error('Invalid cron for scheduler '.$scheduler->id.': '.$e->getMessage());
 
-                continue;
+                return;
             }
 
             if ($due) {
                 RunSchedulerJob::dispatch($scheduler);
             }
-        }
+        });
 
-        return 0;
+        return self::SUCCESS;
     }
 }
