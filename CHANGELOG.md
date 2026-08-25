@@ -5,6 +5,25 @@ All notable changes to `laravel-scheduler-manager` will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.0.1 - 2026-08-25
+
+Patch release. No behaviour change on Livewire 3; groundwork and documentation corrections toward Livewire 4.
+
+### Fixed
+
+- The service provider now registers the package's Livewire class namespace with `addNamespace()` in addition to `Livewire::component()`. Livewire 4 resolves a namespaced alias such as `scheduler-manager::dashboard` exclusively through registered class namespaces and never consults the explicit component map, so without this every screen is unresolvable there. The call goes through the facade root behind a `method_exists` check, since the method does not exist on Livewire 3.
+
+### Documentation
+
+- The 1.0.0 notes said Livewire 4 was unsupported without stating a verified reason. Both stated reasons turned out to be real, and one of them is now fixed. The remaining blocker is documented precisely: `SupportCompiledWireKeys` injects a `<?php ?>` block *inside* the tag carrying `wire:key`, which produces invalid Blade on a component tag such as `<flux:table.row wire:key="...">`, and the view dies with `syntax error, unexpected token "endif"`. Tracked in #48.
+- Added a warning that compiled Blade views are cached keyed on the Blade **source**, not the Livewire version. Running the suite after switching Livewire majors silently reuses views compiled by the other one and reports a false green — clearing the cache turned a reported 233-passed into 66-failed. `CLAUDE.md` and `CONTRIBUTING.md` both call this out.
+
+### Still true
+
+`livewire/livewire` remains pinned to `^3.7`. Livewire 4 support is tracked in #48 and is not complete.
+
+**Full Changelog**: https://github.com/cleaniquecoders/laravel-scheduler-manager/compare/1.0.0...1.0.1
+
 ## 1.0.0 - 2026-08-25
 
 First public release. Manage Laravel scheduled tasks as database records, with a Livewire UI, instead of hard-coding them in `routes/console.php`.
@@ -65,6 +84,7 @@ use Illuminate\Support\Facades\Schedule;
 
 Schedule::command('scheduler-manager:tick')->everyMinute();
 Schedule::command('scheduler-manager:prune')->daily();
+
 
 ```
 Publish tags are `scheduler-manager-config`, `scheduler-manager-migrations` and `scheduler-manager-views`.
