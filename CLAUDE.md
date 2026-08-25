@@ -127,15 +127,23 @@ No Flux Pro component may be used — `livewire/flux-pro` is not on Packagist at
 the private `composer.fluxui.dev` repository against per-licence credentials), so a Pro component
 would force every consumer to buy a licence and CI to hold licence secrets.
 
-**Both Livewire majors are supported** (`^3.7|^4.0`), and CI exercises both.
+**`livewire/livewire` is pinned to `^3.7`. Livewire 4 does not work yet.** Two separate problems:
 
-Livewire 4 resolves a namespaced alias such as `scheduler-manager::dashboard` *exclusively* through
-its registered class namespaces — `Finder::resolveClassComponentClassName()` returns `null` without
-ever consulting the explicit `classComponents` map. So `Livewire::component()` alone, which is all
-Livewire 3 needs, leaves every screen unresolvable on 4. The provider therefore also calls
-`addNamespace('scheduler-manager', classNamespace: ...)`, which exists only on Livewire 4 — hence the
-`method_exists` check against `Livewire::getFacadeRoot()` rather than the static proxy, which would
-not type-check against Livewire 3.
+1. Livewire 4 resolves a namespaced alias such as `scheduler-manager::dashboard` *exclusively*
+   through registered class namespaces — `Finder::resolveClassComponentClassName()` returns `null`
+   without ever consulting the explicit `classComponents` map. The provider already works around
+   this by also calling `addNamespace()` behind a `method_exists` check on the facade root, so this
+   part is solved.
+2. **Unsolved.** `SupportCompiledWireKeys` precompiles `wire:key` by `str_replace`-ing a
+   `<?php ... ?>` block immediately *before the attribute*, i.e. inside the tag. On a Blade
+   component tag such as `<flux:table.row wire:key="...">` the component compiler then emits
+   invalid PHP, and the view dies with `syntax error, unexpected token "endif"`. It is upstream
+   behaviour, not something to paper over. Tracked in issue #48.
+
+**Clear the compiled Blade cache when testing across Livewire majors.** Compiled views are keyed on
+the Blade source, not on the Livewire version, so a suite run after switching majors will happily
+reuse views compiled by the other one and report a false green. Delete
+`vendor/orchestra/testbench-core/laravel/storage/framework/views/*.php` first.
 
 **`phpstan-baseline.neon` must stay empty.** Level 5 with `checkModelProperties: true` and
 `checkOctaneCompatibility: true` over `src`, `config`, `database`. Fix findings; never baseline them.
