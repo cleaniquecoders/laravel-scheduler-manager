@@ -150,6 +150,16 @@ return [
      * denies by default: this UI can execute arbitrary Artisan commands on the
      * host, so "any authenticated user" is not a safe default. Define the
      * ability in your AuthServiceProvider to grant access.
+     *
+     * The closure is called with the user, the scheduler being acted on (null
+     * for the index, the dashboard and creation) and the ability requested —
+     * one of viewAny, view, create, update, delete, run, toggle — so access can
+     * be narrowed per action. Declare only the arguments you need:
+     *
+     *  Gate::define('manage-schedulers', fn ($user) => $user->isAdmin());
+     *
+     *  Gate::define('manage-schedulers', fn ($user, ?Scheduler $scheduler, string $ability) =>
+     *      $user->isAdmin() || ($ability === 'run' && $user->isOperator()));
      */
     'gate' => 'manage-schedulers',
 ];

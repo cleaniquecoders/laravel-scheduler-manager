@@ -16,6 +16,13 @@ class SchedulerIndex extends Component
 {
     use AuthorizesSchedulers, WithPagination;
 
+    /**
+     * Columns the table may be ordered by.
+     *
+     * @var list<string>
+     */
+    protected const SORTABLE = ['name', 'last_run_at', 'next_run_at'];
+
     #[Url(as: 'q', except: '')]
     public string $search = '';
 
@@ -53,12 +60,23 @@ class SchedulerIndex extends Component
 
     public function sortBy(string $column): void
     {
-        if (! in_array($column, ['name', 'last_run_at', 'next_run_at'], true)) {
+        if (! in_array($column, static::SORTABLE, true)) {
             return;
         }
 
         $this->direction = $this->sort === $column && $this->direction === 'asc' ? 'desc' : 'asc';
         $this->sort = $column;
+    }
+
+    /**
+     * Both properties are client-writable — they are bound to the query string —
+     * so the column reaches the query builder from user input. Resolve it
+     * against the whitelist here as well as in sortBy(), which a request that
+     * sets the property directly never goes through.
+     */
+    protected function sortColumn(): string
+    {
+        return in_array($this->sort, static::SORTABLE, true) ? $this->sort : 'name';
     }
 
     public function toggle(string $uuid): void
@@ -106,7 +124,7 @@ class SchedulerIndex extends Component
             ))
             ->when($this->type !== '', fn (Builder $q) => $q->where('type', $this->type))
             ->when($this->state !== '', fn (Builder $q) => $q->where('enabled', $this->state === 'enabled'))
-            ->orderBy($this->sort, $this->direction === 'desc' ? 'desc' : 'asc')
+            ->orderBy($this->sortColumn(), $this->direction === 'desc' ? 'desc' : 'asc')
             ->paginate($this->perPage());
 
         return view('scheduler-manager::livewire.scheduler-index', [

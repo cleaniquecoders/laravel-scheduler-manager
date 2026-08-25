@@ -11,6 +11,7 @@ use CleaniqueCoders\LaravelSchedulerManager\Rules\ValidTimezone;
 use Cron\CronExpression;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Carbon;
+use Livewire\Attributes\Computed;
 use Livewire\Component;
 
 class SchedulerForm extends Component
@@ -98,25 +99,35 @@ class SchedulerForm extends Component
      * The next few fire times, so an operator can sanity-check an expression
      * before saving it rather than discovering the mistake a day later.
      *
+     * The preview is computed on every keystroke, from values the operator is
+     * still typing, so it must never raise: an unparseable expression or an
+     * unknown timezone yields no preview and is reported by validation on save.
+     *
      * @return array<int, string>
      */
-    public function getUpcomingRunsProperty(): array
+    #[Computed]
+    public function upcomingRuns(): array
     {
         if (! CronExpression::isValidExpression($this->cron)) {
             return [];
         }
 
         $timezone = $this->timezone ?: config('app.timezone', 'UTC');
-        $cron = new CronExpression($this->cron);
-        $from = Carbon::now($timezone);
 
-        return collect(range(0, 4))
-            ->map(function (int $index) use ($cron, $from, $timezone) {
-                $next = Carbon::instance($cron->getNextRunDate($from, $index));
+        try {
+            $cron = new CronExpression($this->cron);
+            $from = Carbon::now($timezone);
 
-                return $next->format('Y-m-d H:i').' '.$timezone;
-            })
-            ->all();
+            return collect(range(0, 4))
+                ->map(function (int $index) use ($cron, $from, $timezone) {
+                    $next = Carbon::instance($cron->getNextRunDate($from, $index));
+
+                    return $next->format('Y-m-d H:i').' '.$timezone;
+                })
+                ->all();
+        } catch (\Throwable) {
+            return [];
+        }
     }
 
     public function save(): void
@@ -166,7 +177,7 @@ class SchedulerForm extends Component
             'types' => SchedulerType::options(),
             'actions' => array_keys(config('scheduler-manager.actions', [])),
             'timezones' => timezone_identifiers_list(),
-            'upcoming' => $this->upcomingRuns,
+            'upcoming' => $this->upcomingRuns(),
         ])->layout($this->layout());
     }
 }

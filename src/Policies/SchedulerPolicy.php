@@ -18,27 +18,27 @@ class SchedulerPolicy
 {
     public function viewAny(?Authenticatable $user): bool
     {
-        return $this->allows($user);
+        return $this->allows($user, 'viewAny');
     }
 
     public function view(?Authenticatable $user, Scheduler $scheduler): bool
     {
-        return $this->allows($user, $scheduler);
+        return $this->allows($user, 'view', $scheduler);
     }
 
     public function create(?Authenticatable $user): bool
     {
-        return $this->allows($user);
+        return $this->allows($user, 'create');
     }
 
     public function update(?Authenticatable $user, Scheduler $scheduler): bool
     {
-        return $this->allows($user, $scheduler);
+        return $this->allows($user, 'update', $scheduler);
     }
 
     public function delete(?Authenticatable $user, Scheduler $scheduler): bool
     {
-        return $this->allows($user, $scheduler);
+        return $this->allows($user, 'delete', $scheduler);
     }
 
     /**
@@ -47,22 +47,30 @@ class SchedulerPolicy
      */
     public function run(?Authenticatable $user, Scheduler $scheduler): bool
     {
-        return $this->allows($user, $scheduler);
+        return $this->allows($user, 'run', $scheduler);
     }
 
     public function toggle(?Authenticatable $user, Scheduler $scheduler): bool
     {
-        return $this->allows($user, $scheduler);
+        return $this->allows($user, 'toggle', $scheduler);
     }
 
-    protected function allows(?Authenticatable $user, ?Scheduler $scheduler = null): bool
+    /**
+     * The configured gate receives the scheduler (null for the collection-level
+     * abilities) and the ability being checked, so an application can grant
+     * "run" without granting "update" — triggering a task by hand and changing
+     * what that task executes are very different privileges. A gate that only
+     * declares the arguments it cares about keeps working: PHP ignores the
+     * extra ones.
+     */
+    protected function allows(?Authenticatable $user, string $ability, ?Scheduler $scheduler = null): bool
     {
-        $ability = config('scheduler-manager.gate', 'manage-schedulers');
+        $gate = config('scheduler-manager.gate', 'manage-schedulers');
 
-        if (! Gate::has($ability)) {
+        if (! Gate::has($gate)) {
             return false;
         }
 
-        return Gate::forUser($user)->allows($ability, $scheduler);
+        return Gate::forUser($user)->allows($gate, [$scheduler, $ability]);
     }
 }
